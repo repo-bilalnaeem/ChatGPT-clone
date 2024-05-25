@@ -8,23 +8,63 @@ import {
   Image,
   TextInput,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { defaultStyles } from "@/constants/Styles";
 import Colors from "@/constants/Colors";
-
-const onSignUpPress = async () => {};
-const onLoginPress = async () => {};
+import { useSignIn, useSignUp } from "@clerk/clerk-expo";
 
 const Login = () => {
   const { type } = useLocalSearchParams<{ type: string }>();
   const [loading, setLoading] = useState(false);
-  const [emailAddress, setEmailAddress] = useState(
-    "bilal.naeem@nixorcollege.edu.pk"
-  );
+  const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
-  console.log("~ Page ~ type:", type);
+  const { signIn, isLoaded, setActive } = useSignIn();
+  const {
+    signUp,
+    isLoaded: signUpLoaded,
+    setActive: signupSetActive,
+  } = useSignUp();
+
+  const onSignUpPress = async () => {
+    if (!signUpLoaded) return;
+    setLoading(true);
+
+    try {
+      const result = await signUp.create({ emailAddress, password });
+
+      signupSetActive({
+        session: result.createdSessionId,
+      });
+    } catch (error: any) {
+      Alert.alert(error.errors[0].message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onLoginPress = async () => {
+    if (!isLoaded) return;
+    setLoading(true);
+
+    try {
+      const result = await signIn.create({
+        identifier: emailAddress,
+        password,
+      });
+
+      setActive({
+        session: result.createdSessionId,
+      });
+    } catch (error: any) {
+      Alert.alert(error.errors[0].message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS == "ios" ? "padding" : "height"}

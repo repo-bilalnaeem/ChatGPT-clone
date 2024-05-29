@@ -26,7 +26,8 @@ const Page = () => {
       <Stack.Screen
         options={{
           headerTitle: () => (
-            <HeaderDropDown
+            <>
+            {/* <HeaderDropDown
               title="ChatGPT"
               onSelect={(key) => {
                 // console.log(key);
@@ -37,7 +38,8 @@ const Page = () => {
                 { key: "3.5", title: "GPT-3.5", icon: "bolt" },
                 { key: "4", title: "GPT-4", icon: "sparkles" },
               ]}
-            />
+              /> */}
+              </>
           ),
         }}
       />
@@ -60,7 +62,7 @@ const Page = () => {
         // }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <MessageInput onShouldSendMessage={getCompletion} />
+        <MessageInput onShouldSend={getCompletion} />
       </KeyboardAvoidingView>
     </View>
   );

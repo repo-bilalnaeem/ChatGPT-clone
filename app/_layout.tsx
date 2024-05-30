@@ -61,11 +61,7 @@ const InitialLayout = () => {
   }, [isSignedIn]);
 
   if (!loaded || !isLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color="#000" />
-      </View>
-    );
+    return <Slot />;
   }
 
   return (

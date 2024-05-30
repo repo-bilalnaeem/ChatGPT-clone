@@ -1,6 +1,6 @@
-import Colors from "@/constants/Colors";
-import { memo } from "react";
-import { StyleSheet, useWindowDimensions } from "react-native";
+import Colors from '@/constants/Colors';
+import { memo } from 'react';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolate,
   interpolateColor,
@@ -10,8 +10,8 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
-} from "react-native-reanimated";
-import { ReText } from "react-native-redash";
+} from 'react-native-reanimated';
+import { ReText } from 'react-native-redash';
 
 const content = [
   {
@@ -35,7 +35,7 @@ const content = [
     fontColor: Colors.yellow,
   },
   {
-    title: "ChatGPT.",
+    title: 'ChatGPT.',
     bg: Colors.green,
     fontColor: Colors.pink,
   },
@@ -65,11 +65,8 @@ const AnimatedIntro = () => {
       color: interpolateColor(
         currentX.value,
         [half, half + labelWidth.value / 2],
-        [
-          content[newColorIndex.value].fontColor,
-          content[currentIndex.value].fontColor,
-        ],
-        "RGB"
+        [content[newColorIndex.value].fontColor, content[currentIndex.value].fontColor],
+        'RGB'
       ),
       transform: [
         {
@@ -88,11 +85,8 @@ const AnimatedIntro = () => {
       backgroundColor: interpolateColor(
         currentX.value,
         [half, half + labelWidth.value / 2],
-        [
-          content[newColorIndex.value].fontColor,
-          content[currentIndex.value].fontColor,
-        ],
-        "RGB"
+        [content[newColorIndex.value].fontColor, content[currentIndex.value].fontColor],
+        'RGB'
       ),
       transform: [{ translateX: currentX.value }],
     };
@@ -104,7 +98,7 @@ const AnimatedIntro = () => {
         currentX.value,
         [half, half + labelWidth.value / 2],
         [content[newColorIndex.value].bg, content[currentIndex.value].bg],
-        "RGB"
+        'RGB'
       ),
       transform: [{ translateX: currentX.value }],
       width: width / 1.5,
@@ -119,16 +113,12 @@ const AnimatedIntro = () => {
       currentX.value,
       [half, half + labelWidth.value / 2],
       [content[newColorIndex.value].bg, content[currentIndex.value].bg],
-      "RGB"
+      'RGB'
     ),
     opacity: interpolate(1, [1, 0], [1, 0, 0, 0, 0, 0, 0]),
     transform: [
       {
-        translateX: interpolate(
-          1,
-          [1, 0],
-          [0, -width * 2, -width, -width, -width, -width, -width]
-        ),
+        translateX: interpolate(1, [1, 0], [0, -width * 2, -width, -width, -width, -width, -width]),
       },
     ],
   }));
@@ -209,27 +199,27 @@ const styles = StyleSheet.create({
   },
   mask: {
     zIndex: 1,
-    position: "absolute",
-    left: "0%",
+    position: 'absolute',
+    left: '0%',
     height: 44,
   },
   ball: {
     width: 40,
     zIndex: 10,
     height: 40,
-    backgroundColor: "#000",
+    backgroundColor: '#000',
     borderRadius: 20,
-    position: "absolute",
-    left: "0%",
+    position: 'absolute',
+    left: '0%',
   },
   titleText: {
-    flexDirection: "row",
+    flexDirection: 'row',
   },
   title: {
     fontSize: 36,
-    fontWeight: "600",
-    left: "0%",
-    position: "absolute",
+    fontWeight: '600',
+    left: '0%',
+    position: 'absolute',
   },
   content: {
     marginTop: 300,

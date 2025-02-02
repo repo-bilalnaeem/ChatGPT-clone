@@ -1,44 +1,81 @@
-import HeaderDropDown from '@/components/HeaderDropDown';
-import MessageInput from '@/components/MessageInput';
-import { defaultStyles } from '@/constants/Styles';
-import { keyStorage, storage } from '@/utils/Storage';
-import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, View, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { useMMKVString } from 'react-native-mmkv';
-import OpenAI from 'react-native-openai';
-import { FlashList } from '@shopify/flash-list';
-import ChatMessage from '@/components/ChatMessage';
-import { Message, Role } from '@/utils/Interfaces';
-import MessageIdeas from '@/components/MessageIdeas';
-import { addChat, addMessage, getMessages } from '@/utils/Database';
-import { useSQLiteContext } from 'expo-sqlite/next';
+import {
+  View,
+  Text,
+  Button,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Keyboard,
+} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@clerk/clerk-expo";
+import { defaultStyles } from "@/constants/Styles";
+import { Redirect, Stack, useLocalSearchParams } from "expo-router";
+import HeaderDropDown from "@/components/HeaderDropDown";
+import MessageInput from "@/components/MessageInput";
+import MessageIdeas from "@/components/MessageIdeas";
+import { Message, Role } from "@/utils/Interfaces";
+import { StyleSheet } from "react-native";
+import { Image } from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import ChatMessage from "@/components/ChatMessage";
+import { useMMKV, useMMKVString } from "react-native-mmkv";
+import { Storage } from "@/utils/Storage";
+import OpenAI from "react-native-openai";
+import { useSQLiteContext } from "expo-sqlite";
+import { addChat, addMessage, getMessages } from "@/utils/Database";
+
+// const DUMMY_MESSAGES: Message[] = [
+//   {
+//     content: "Hello, how can I help you today?",
+//     role: Role.Bot,
+//     imageUrl: "https://placekitten.com/200/200",
+//     prompt: "GPT-3.5",
+//   },
+//   {
+//     content:
+//       "I need help with my React Native app.I need help with my React Native app.I need help with my React Native app.I need help with my React Native app.I need help with my React Native app",
+//     role: Role.User,
+//     imageUrl: "https://placekitten.com/200/200",
+//     prompt: "GPT-3.5",
+//   },
+//   {
+//     content: "Sure, what do you need help with?",
+//     role: Role.Bot,
+//     imageUrl: "https://placekitten.com/200/200",
+//     prompt: "GPT-3.5",
+//   },
+// ];
 
 const ChatPage = () => {
-  const [gptVersion, setGptVersion] = useMMKVString('gptVersion', storage);
-  const [height, setHeight] = useState(0);
-  const [key, setKey] = useMMKVString('apikey', keyStorage);
-  const [organization, setOrganization] = useMMKVString('org', keyStorage);
+  const { signOut } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [height, setHeight] = useState(0);
+
+  const [key, setKey] = useMMKVString("apiKey", Storage);
+  const [organization, setOrganization] = useMMKVString("org", Storage);
+  const [gptVersion, setGptVersion] = useMMKVString("gptVersion", Storage);
+
+  const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
-  let { id } = useLocalSearchParams<{ id: string }>();
+  const [chatId, _setChatId] = useState<string>(id);
 
-  if (!key || key === '' || !organization || organization === '') {
-    return <Redirect href={'/(auth)/(modal)/settings'} />;
-  }
-
-  const [chatId, _setChatId] = useState(id);
   const chatIdRef = useRef(chatId);
-  // https://stackoverflow.com/questions/55265255/react-usestate-hook-event-handler-using-initial-state
   function setChatId(id: string) {
     chatIdRef.current = id;
     _setChatId(id);
   }
 
+  if (!key || key === "" || !organization || organization === "") {
+    return <Redirect href={"/(auth)/(modal)/settings"} />;
+  }
+
   useEffect(() => {
     if (id) {
-      getMessages(db, parseInt(id)).then((res) => {
-        setMessages(res);
+      console.log("load for Chat Id: ", id);
+      getMessages(db, parseInt(id)).then((messages) => {
+        console.log("Got Messages:", messages);
+        setMessages(messages);
       });
     }
   }, [id]);
@@ -52,62 +89,70 @@ const ChatPage = () => {
     []
   );
 
+  const getCompletion = async (message: string) => {
+    console.log("Getting completion for: ", message);
+
+    if (messages.length === 0) {
+      const result = await addChat(db, message);
+      console.log(result);
+      const chatID = result.lastInsertRowId;
+      setChatId(chatID.toString());
+      console.log("Chat ID:", chatID);
+      addMessage(db, chatID, { content: message, role: Role.User });
+    }
+
+    setMessages([
+      ...messages,
+      { content: message, role: Role.User },
+      { role: Role.Bot, content: "" },
+    ]);
+
+    openAI.chat.stream({
+      messages: [
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      model: gptVersion === "4" ? "gpt-4" : "gpt-3.5-turbo",
+    });
+  };
+
   useEffect(() => {
-    const handleNewMessage = (payload: any) => {
+    const handleMessage = (payload: any) => {
+      // console.log("Received message: ", payload);
       setMessages((messages) => {
-        const newMessage = payload.choices[0]?.delta.content;
+        const newMessage = payload.choices[0].delta.content;
         if (newMessage) {
           messages[messages.length - 1].content += newMessage;
           return [...messages];
         }
-        if (payload.choices[0]?.finishReason) {
-          // save the last message
 
+        if (payload.choices[0]?.finishReason) {
+          // Save the messages to the DB
+          // console.log("Stream ended");
+          // console.log("Save bot message to: ", chatIdRef.current);
           addMessage(db, parseInt(chatIdRef.current), {
             content: messages[messages.length - 1].content,
             role: Role.Bot,
           });
         }
+
         return messages;
       });
     };
 
-    openAI.chat.addListener('onChatMessageReceived', handleNewMessage);
+    openAI.chat.addListener("onChatMessageReceived", handleMessage);
 
     return () => {
-      openAI.chat.removeListener('onChatMessageReceived');
+      openAI.chat.removeListener("onChatMessageReceived");
     };
   }, [openAI]);
 
-  const onGptVersionChange = (version: string) => {
-    setGptVersion(version);
-  };
-
   const onLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    setHeight(height / 2);
-  };
-
-  const getCompletion = async (text: string) => {
-    if (messages.length === 0) {
-      addChat(db, text).then((res) => {
-        const chatID = res.lastInsertRowId;
-        setChatId(chatID.toString());
-        addMessage(db, chatID, { content: text, role: Role.User });
-      });
-    }
-
-    setMessages([...messages, { role: Role.User, content: text }, { role: Role.Bot, content: '' }]);
-    messages.push();
-    openAI.chat.stream({
-      messages: [
-        {
-          role: 'user',
-          content: text,
-        },
-      ],
-      model: gptVersion == '4' ? 'gpt-4' : 'gpt-3.5-turbo',
-    });
+    console.log(height);
+    setHeight(height);
   };
 
   return (
@@ -116,41 +161,50 @@ const ChatPage = () => {
         options={{
           headerTitle: () => (
             <HeaderDropDown
-              title="ChatGPT"
-              items={[
-                { key: '3.5', title: 'GPT-3.5', icon: 'bolt' },
-                { key: '4', title: 'GPT-4', icon: 'sparkles' },
-              ]}
-              onSelect={onGptVersionChange}
+              onSelect={(key) => {
+                setGptVersion(key);
+              }}
               selected={gptVersion}
+              title={"ChatGPT"}
+              items={[
+                { key: "3.5", title: "GPT-3.5", icon: "bolt" },
+                { key: "4", title: "GPT-4", icon: "sparkles" },
+              ]}
             />
           ),
         }}
       />
-      <View style={styles.page} onLayout={onLayout}>
-        {messages.length == 0 && (
+      <View style={{ flex: 1 }} onLayout={onLayout}>
+        {messages.length === 0 && (
           <View style={[styles.logoContainer, { marginTop: height / 2 - 100 }]}>
-            <Image source={require('@/assets/images/logo-white.png')} style={styles.image} />
+            <Image
+              source={require("@/assets/images/logo-white.png")}
+              style={styles.image}
+            />
           </View>
         )}
         <FlashList
           data={messages}
           renderItem={({ item }) => <ChatMessage {...item} />}
           estimatedItemSize={400}
-          contentContainerStyle={{ paddingTop: 30, paddingBottom: 150 }}
+          keyExtractor={(item, index) => index.toString()}
+          contentContainerStyle={{
+            paddingBottom: 150,
+            paddingTop: 30,
+          }}
           keyboardDismissMode="on-drag"
         />
       </View>
-
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={70}
         style={{
-          position: 'absolute',
+          position: "absolute",
           bottom: 0,
           left: 0,
-          width: '100%',
-        }}>
+          width: "100%",
+        }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         {messages.length === 0 && <MessageIdeas onSelectCard={getCompletion} />}
         <MessageInput onShouldSend={getCompletion} />
       </KeyboardAvoidingView>
@@ -160,21 +214,19 @@ const ChatPage = () => {
 
 const styles = StyleSheet.create({
   logoContainer: {
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
     width: 50,
     height: 50,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
     borderRadius: 50,
   },
   image: {
     width: 30,
     height: 30,
-    resizeMode: 'cover',
-  },
-  page: {
-    flex: 1,
+    resizeMode: "cover",
   },
 });
+
 export default ChatPage;

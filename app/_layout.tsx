@@ -1,11 +1,11 @@
-import { useFonts } from 'expo-font';
-import { Slot, SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect } from 'react';
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import * as SecureStore from 'expo-secure-store';
-import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts } from "expo-font";
+import { Slot, SplashScreen, Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
+import * as SecureStore from "expo-secure-store";
+import { Ionicons } from "@expo/vector-icons";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 // Cache the Clerk JWT
@@ -31,7 +31,7 @@ SplashScreen.preventAutoHideAsync();
 
 const InitialLayout = () => {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
@@ -51,17 +51,23 @@ const InitialLayout = () => {
   useEffect(() => {
     if (!isLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const inAuthGroup = segments[0] === "(auth)";
+    console.log(inAuthGroup);
+    console.log(isSignedIn);
 
     if (isSignedIn && !inAuthGroup) {
-      router.replace('/(auth)/(drawer)/(chat)/new');
-    } else if (!isSignedIn) {
-      router.replace('/');
+      router.replace("/(auth)/(drawer)/(chat)/new");
+    } else if (!isSignedIn && inAuthGroup) {
+      router.replace("/");
     }
   }, [isSignedIn]);
 
   if (!loaded || !isLoaded) {
-    return <Slot />;
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size={"large"} color={"#000"} />
+      </View>
+    );
   }
 
   return (
@@ -75,10 +81,10 @@ const InitialLayout = () => {
       <Stack.Screen
         name="login"
         options={{
-          presentation: 'modal',
-          title: '',
+          presentation: "modal",
+          title: "",
           headerTitleStyle: {
-            fontFamily: 'mon-sb',
+            fontFamily: "mon-sb",
           },
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()}>
@@ -94,7 +100,10 @@ const InitialLayout = () => {
 
 const RootLayoutNav = () => {
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY!} tokenCache={tokenCache}>
+    <ClerkProvider
+      publishableKey={CLERK_PUBLISHABLE_KEY!}
+      tokenCache={tokenCache}
+    >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <InitialLayout />
       </GestureHandlerRootView>

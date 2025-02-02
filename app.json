@@ -1,30 +1,28 @@
 {
   "expo": {
-    "name": "ChatGPT",
-    "slug": "ChatGPT",
+    "name": "chatgpt",
+    "slug": "chatgpt",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bilal.chatgpt"
+      "bundleIdentifier": "com.anonymous.chatgpt"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.bilal.chatgpt",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.anonymous.chatgpt"
     },
     "web": {
       "bundler": "metro",
@@ -33,40 +31,34 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 34,
-            "minSdkVersion": 23,
+            "minSdkVersion": 24,
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33,
             "buildToolsVersion": "33.0.0",
             "kotlinVersion": "1.6.20"
           },
           "ios": {
-            "deploymentTarget": "15.0"
+            "deploymentTarget": "15.1"
           }
         }
       ],
       [
-        "expo-image-picker",
+        "expo-media-library",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
           "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "9ed01d3f-7ba0-457e-95ac-7618f7607a1f"
-      }
     }
   }
 }

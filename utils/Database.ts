@@ -76,8 +76,10 @@ export const addMessage = async (
 };
 
 export const deleteChat = async (db: SQLiteDatabase, chatId: number) => {
-  return await db.runAsync('DELETE FROM chats WHERE id = ?', chatId);
+  await db.runAsync('DELETE FROM messages WHERE chat_id = ?', chatId); // Delete messages first
+  return await db.runAsync('DELETE FROM chats WHERE id = ?', chatId); // Then delete chat
 };
+
 
 export const renameChat = async (db: SQLiteDatabase, chatId: number, title: string) => {
   return await db.runAsync('UPDATE chats SET title = ? WHERE id = ?', title, chatId);

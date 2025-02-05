@@ -1,12 +1,4 @@
-import {
-  View,
-  Text,
-  Button,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Keyboard,
-} from "react-native";
+import { View, KeyboardAvoidingView, Platform, Image } from "react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-expo";
 import { defaultStyles } from "@/constants/Styles";
@@ -16,69 +8,50 @@ import MessageInput from "@/components/MessageInput";
 import MessageIdeas from "@/components/MessageIdeas";
 import { Message, Role } from "@/utils/Interfaces";
 import { StyleSheet } from "react-native";
-import { Image } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import ChatMessage from "@/components/ChatMessage";
-import { useMMKV, useMMKVString } from "react-native-mmkv";
+import { useMMKVString } from "react-native-mmkv";
 import { Storage } from "@/utils/Storage";
 import OpenAI from "react-native-openai";
 import { useSQLiteContext } from "expo-sqlite";
 import { addChat, addMessage, getMessages } from "@/utils/Database";
-
-// const DUMMY_MESSAGES: Message[] = [
-//   {
-//     content: "Hello, how can I help you today?",
-//     role: Role.Bot,
-//     imageUrl: "https://placekitten.com/200/200",
-//     prompt: "GPT-3.5",
-//   },
-//   {
-//     content:
-//       "I need help with my React Native app.I need help with my React Native app.I need help with my React Native app.I need help with my React Native app.I need help with my React Native app",
-//     role: Role.User,
-//     imageUrl: "https://placekitten.com/200/200",
-//     prompt: "GPT-3.5",
-//   },
-//   {
-//     content: "Sure, what do you need help with?",
-//     role: Role.Bot,
-//     imageUrl: "https://placekitten.com/200/200",
-//     prompt: "GPT-3.5",
-//   },
-// ];
 
 const ChatPage = () => {
   const { signOut } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [height, setHeight] = useState(0);
 
-  const [key, setKey] = useMMKVString("apiKey", Storage);
-  const [organization, setOrganization] = useMMKVString("org", Storage);
+  const [key] = useMMKVString("apiKey", Storage);
+  const [organization] = useMMKVString("org", Storage);
   const [gptVersion, setGptVersion] = useMMKVString("gptVersion", Storage);
 
   const { id } = useLocalSearchParams<{ id: string }>();
   const db = useSQLiteContext();
-  const [chatId, _setChatId] = useState<string>(id);
-
-  const chatIdRef = useRef(chatId);
-  function setChatId(id: string) {
-    chatIdRef.current = id;
-    _setChatId(id);
-  }
-
-  if (!key || key === "" || !organization || organization === "") {
-    return <Redirect href={"/(auth)/(modal)/settings"} />;
-  }
+  const [chatId, setChatId] = useState<string | null>(id);
+  const chatIdRef = useRef<string | null>(id);
 
   useEffect(() => {
-    if (id) {
-      console.log("load for Chat Id: ", id);
-      getMessages(db, parseInt(id)).then((messages) => {
-        console.log("Got Messages:", messages);
-        setMessages(messages);
-      });
-    }
+    if (!id) return;
+
+    console.log("Switching to Chat ID:", id);
+
+    setMessages([]); // 🛑 Clear previous messages before fetching new ones
+
+    getMessages(db, parseInt(id))
+      .then((messages) => {
+        if (!Array.isArray(messages)) {
+          console.error("Invalid messages format:", messages);
+          setMessages([]);
+          return;
+        }
+        setMessages(messages.filter((msg) => msg?.content !== undefined));
+      })
+      .catch((err) => console.error("Error fetching messages:", err));
   }, [id]);
+
+  if (!key || !organization) {
+    return <Redirect href={"/(auth)/(modal)/settings"} />;
+  }
 
   const openAI = useMemo(
     () =>
@@ -86,59 +59,81 @@ const ChatPage = () => {
         apiKey: key,
         organization,
       }),
-    []
+    [key, organization]
   );
 
   const getCompletion = async (message: string) => {
-    console.log("Getting completion for: ", message);
+    console.log("Getting completion for:", message);
+    let chatID = chatIdRef.current;
 
-    if (messages.length === 0) {
-      const result = await addChat(db, message);
-      console.log(result);
-      const chatID = result.lastInsertRowId;
-      setChatId(chatID.toString());
-      console.log("Chat ID:", chatID);
-      addMessage(db, chatID, { content: message, role: Role.User });
+    if (!chatID) {
+      try {
+        const result = await addChat(db, message);
+        chatID = result.lastInsertRowId.toString();
+        setChatId(chatID);
+        chatIdRef.current = chatID;
+        console.log("New Chat ID:", chatID);
+      } catch (error) {
+        console.error("Error creating new chat:", error);
+        return;
+      }
     }
 
-    setMessages([
-      ...messages,
-      { content: message, role: Role.User },
-      { role: Role.Bot, content: "" },
-    ]);
+    const userMessage = { content: message, role: Role.User };
+    const botMessage = { role: Role.Bot, content: "" };
 
-    openAI.chat.stream({
-      messages: [
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-      model: gptVersion === "4" ? "gpt-4" : "gpt-3.5-turbo",
-    });
+    setMessages((prevMessages) => [...prevMessages, userMessage, botMessage]);
+
+    try {
+      await addMessage(db, parseInt(chatID), userMessage);
+    } catch (error) {
+      console.error("Error saving user message:", error);
+    }
+
+    try {
+      const stream = openAI.chat.stream({
+        messages: [{ role: "user", content: message }],
+        model: gptVersion === "4" ? "gpt-4" : "gpt-3.5-turbo",
+      });
+    } catch (error) {
+      console.error("OpenAI API Error:", error);
+    }
   };
 
   useEffect(() => {
     const handleMessage = (payload: any) => {
-      // console.log("Received message: ", payload);
-      setMessages((messages) => {
-        const newMessage = payload.choices[0].delta.content;
-        if (newMessage) {
-          messages[messages.length - 1].content += newMessage;
-          return [...messages];
+      if (!payload.choices || payload.choices.length === 0) return;
+
+      setMessages((prevMessages) => {
+        if (prevMessages.length === 0) return prevMessages;
+
+        const lastMessageIndex = prevMessages.length - 1;
+        const lastMessage = prevMessages[lastMessageIndex];
+
+        if (!lastMessage || lastMessage.role !== Role.Bot) return prevMessages;
+
+        const newContent = payload.choices[0]?.delta?.content || "";
+
+        if (newContent) {
+          return prevMessages.map((msg, index) =>
+            index === lastMessageIndex
+              ? { ...msg, content: msg.content + newContent }
+              : msg
+          );
         }
 
         if (payload.choices[0]?.finishReason) {
-          // Save the messages to the DB
-          // console.log("Stream ended");
-          // console.log("Save bot message to: ", chatIdRef.current);
-          addMessage(db, parseInt(chatIdRef.current), {
-            content: messages[messages.length - 1].content,
-            role: Role.Bot,
-          });
+          try {
+            addMessage(db, parseInt(chatIdRef.current as string), {
+              content: prevMessages[lastMessageIndex].content,
+              role: Role.Bot,
+            });
+          } catch (error) {
+            console.error("Error saving bot message:", error);
+          }
         }
 
-        return messages;
+        return prevMessages;
       });
     };
 
@@ -150,9 +145,7 @@ const ChatPage = () => {
   }, [openAI]);
 
   const onLayout = (event: any) => {
-    const { height } = event.nativeEvent.layout;
-    console.log(height);
-    setHeight(height);
+    setHeight(event.nativeEvent.layout.height);
   };
 
   return (
@@ -161,9 +154,7 @@ const ChatPage = () => {
         options={{
           headerTitle: () => (
             <HeaderDropDown
-              onSelect={(key) => {
-                setGptVersion(key);
-              }}
+              onSelect={(key) => setGptVersion(key)}
               selected={gptVersion}
               title={"ChatGPT"}
               items={[
@@ -188,21 +179,13 @@ const ChatPage = () => {
           renderItem={({ item }) => <ChatMessage {...item} />}
           estimatedItemSize={400}
           keyExtractor={(item, index) => index.toString()}
-          contentContainerStyle={{
-            paddingBottom: 150,
-            paddingTop: 30,
-          }}
+          contentContainerStyle={{ paddingBottom: 150, paddingTop: 30 }}
           keyboardDismissMode="on-drag"
         />
       </View>
       <KeyboardAvoidingView
         keyboardVerticalOffset={70}
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          width: "100%",
-        }}
+        style={{ position: "absolute", bottom: 0, left: 0, width: "100%" }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {messages.length === 0 && <MessageIdeas onSelectCard={getCompletion} />}

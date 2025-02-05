@@ -25,7 +25,7 @@ import { useEffect, useState } from "react";
 import { useDrawerStatus } from "@react-navigation/drawer";
 import * as ContextMenu from "zeego/context-menu";
 import { Keyboard } from "react-native";
-import { getChats, renameChat } from "@/utils/Database";
+import { deleteChat, getChats, renameChat } from "@/utils/Database";
 import { Chat } from "@/utils/Interfaces";
 import { useSQLiteContext } from "expo-sqlite";
 
@@ -60,13 +60,13 @@ export const CustomDrawerContent = (props: any) => {
       {
         text: "Delete",
         onPress: async () => {
-          // Delete the chat
-          await db.runAsync("DELETE FROM chats WHERE id = ?", chatId);
-          loadChats();
+          await deleteChat(db, chatId); // Ensure messages are also deleted
+          loadChats(); // Refresh chat list after deletion
         },
       },
     ]);
   };
+  
 
   const onRenameChat = (chatId: number) => {
     Alert.prompt(
@@ -194,14 +194,14 @@ const Layout = () => {
     <Drawer
       drawerContent={CustomDrawerContent}
       screenOptions={{
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => navigation.dispatch(DrawerActions.toggleDrawer)}
-            style={{ marginLeft: 16 }}
-          >
-            <FontAwesome6 name="grip-lines" size={20} color={Colors.grey} />
-          </TouchableOpacity>
-        ),
+        // headerLeft: () => (
+        //   <TouchableOpacity
+        //     onPress={() => navigation.dispatch(DrawerActions.toggleDrawer)}
+        //     style={{ marginLeft: 16 }}
+        //   >
+        //     <FontAwesome6 name="grip-lines" size={20} color={Colors.grey} />
+        //   </TouchableOpacity>
+        // ),
         headerStyle: {
           backgroundColor: Colors.light,
         },
